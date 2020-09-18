@@ -165,6 +165,34 @@ def measurement_update(sensor_var, p_cov_check, y_k, p_check, v_check, q_check):
     return p_hat, v_hat, q_hat, p_cov_hat
 
 #### 5. Main Filter Loop #######################################################################
+def cholesky(A):
+    root = np.zeros(A.shape())
+    root[0][0] = ((A[0][0])**0.5)
+    root[1][0] = A[1][0]/root[0][0]
+    root[2][0] = A[2][0]/root[0][0]
+    root[1][1] = (A[1][1]-(root[1][0]**2))**0.5
+    root[2][1] = (A[2][1] -root[2][0]*root[1][0]) /root[1][1]
+    root[2][2] = (A[2][2]-root[2][0]**2-root[2][1]**2)**0.5
+    return root
+
+def sigmapoint(u,p,l):
+    sp = p.shape
+    #print(sp)
+    n = sp[0]
+    scale = (l + n)**0.5
+    m = 2*sp[0] + 1
+    sigma = np.zeros([n,m])
+    u = u.reshape(n)
+    sigma[:,0] = u
+    for i in range(n):
+        sigma[:,i+1] = u + scale*p[:,i]
+
+    for j in range(n):
+        sigma[:,i+n+1] = u - scale*p[:,i]
+    return sigma
+
+
+
 
 ################################################################################################
 # Now that everything is set up, we can start taking in the sensor data and creating estimates
@@ -173,20 +201,58 @@ def measurement_update(sensor_var, p_cov_check, y_k, p_check, v_check, q_check):
 for k in range(1, imu_f.data.shape[0]):  # start at 1 b/c we have initial prediction from gt
     delta_t = imu_f.t[k] - imu_f.t[k - 1]
     q_est[k-1] = (Quaternion(*q_est[k-1]).normalize()).to_numpy()
-    rm = Quaternion(*q_est[k-1]).to_mat()
+    eular = Quaternion(*q_est[k-1]).to_euler()
+    #print(eular)
+    et = np.zeros(eular.shape)
+    u = np.zeros([9,1])
+    n = 9
+    print("pest")
+    print(p_est[k-1])
+    u[0:3,0] = p_est[k-1][0:3]
+    u[3:6,0] = v_est[k-1][0:3]
+    u[6:9,0] = eular
+    k = 1
+    alpha = 0.5
+    limbda = (alpha**2)*(n + k) - n
+    sigma1 = sigmapoint(u,p_cov[k-1],limbda)
+    print(sigma1[0][0])
+    mean = np.zeros(n)
+    beta = 2
     # 1. Update state with IMU inputs
-    p_est[k] = p_est[k-1] + delta_t*v_est[k-1] + 0.5*(delta_t**2)*(rm@imu_f.data[k-1] + g)
-    v_est[k] = v_est[k-1] + delta_t*(rm@imu_f.data[k-1] + g)
-    q_est[k] = Quaternion(axis_angle =delta_t*imu_w.data[k-1]).quat_mult_right(Quaternion(*q_est[k-1]), out='np')
-    q_est[k] = (Quaternion(*q_est[k]).normalize()).to_numpy()
-    #print(q_est[k])
-    #p_est[k][2] = (p_est[k][2])/10
-    # 1.1 Linearize the motion model and compute Jacobianss
-    f = np.eye(9)
-    f[:3,3:6]= delta_t*np.eye(3)
-    f[3:6,6:9] = -1*skew_symmetric(delta_t*(rm@imu_f.data[k-1]))
 
+    for i in range((2*n+1)):
+        p_check = sigma1[0:3,i]
+        print(p_check)
+        v_check = sigma1[3:6,i]
+        et = sigma1[6:9,i]
+        q_check = Quaternion(euler=et).to_numpy()
+        q_check = (Quaternion(*q_est[k-1]).normalize()).to_numpy()
+        rm = Quaternion(*q_check).to_mat()
+        p_check = p_check + delta_t*v_check + 0.5*(delta_t**2)*(rm@imu_f.data[k-1] + g)
+    	#v_check = v_check + delta_t*(rm@imu_f.data[k-1] + g)
+    	#q_check = Quaternion(axis_angle =delta_t*imu_w.data[k-1]).quat_mult_right(Quaternion(*q_check), out='np')
+    	#q_check = (Quaternion(*q_check).normalize()).to_numpy()
+    	#eulart = Quaternion(*q_check).to_euler()
+    	#if i == 0:
+    	#	wn = limbda/(n + limbda)
+    	#	wc = wn + 1- alpha**2 + beta
 
+    	#else:
+    	#	wn = 1/(2*(n + limbda))
+    	#	wc = 1/(2*(n + limbda))
+
+    	#ut = np.zeros([9,1])
+    	#ut[0:3,0] = p_check[0:3]
+    	#ut[3:6,0] = v_check[0:3]
+    	#ut[6:9,0] = eulart
+    	#mean = mean + wn*ut
+    #p_est[k] = mean[0:3]
+    #v_est[k] = mean[3:6]
+    #eu = mean[6:9]
+    #q_est[k] = Quaternion(euler=eu).to_numpy()
+    #q_est[k] = (Quaternion(*q_est[k]).normalize()).to_numpy()
+
+    """
     # 2. Propagate uncertainty
     imuerr = np.eye(6)
     imuerr[0:3,0:3] =(delta_t**2)*(var_imu_f)*np.eye(3)
@@ -213,7 +279,7 @@ for k in range(1, imu_f.data.shape[0]):  # start at 1 b/c we have initial predic
             y_k = gnss.data[i]
             sensor_var = (var_gnss)*np.eye(3)
             p_est[k], v_est[k], q_est[k], p_cov[k] = measurement_update(sensor_var, p_cov[k], y_k, p_est[k], v_est[k], q_est[k])
-    
+	"""
     # Update states (save)
 #### 6. Results and Analysis ###################################################################
 

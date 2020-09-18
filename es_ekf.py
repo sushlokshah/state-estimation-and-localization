@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from rotations import angle_normalize, rpy_jacobian_axis_angle, skew_symmetric, Quaternion
-
+import time
 #### 1. Data ###################################################################################
 
 ################################################################################################
@@ -224,23 +224,28 @@ for k in range(1, imu_f.data.shape[0]):  # start at 1 b/c we have initial predic
 # your estimated poses from the part of the trajectory where you don't have ground truth!
 ################################################################################################
 est_traj_fig = plt.figure()
+print(p_est.shape)
 ax = est_traj_fig.add_subplot(111, projection='3d')
-ax.plot(p_est[:,0], p_est[:,1], p_est[:,2], label='Estimated')
-ax.plot(gt.p[:,0], gt.p[:,1], gt.p[:,2], label='Ground Truth')
-ax.set_xlabel('Easting [m]')
-ax.set_ylabel('Northing [m]')
-ax.set_zlabel('Up [m]')
-ax.set_title('Ground Truth and Estimated Trajectory')
-ax.set_xlim(0, 200)
-ax.set_ylim(0, 200)
-ax.set_zlim(-2, 2)
-ax.set_xticks([0, 50, 100, 150, 200])
-ax.set_yticks([0, 50, 100, 150, 200])
-ax.set_zticks([-2, -1, 0, 1, 2])
-ax.legend(loc=(0.62,0.77))
-ax.view_init(elev=45, azim=-50)
-plt.show()
+#ax.plot(p_est[:,0], p_est[:,1], p_est[:,2], label='Estimated')
 
+
+ax.plot(gt.p[:,0], gt.p[:,1], gt.p[:,2], label='Ground Truth')
+for i in range(10918-1000):
+	ax.plot(p_est[i][0], p_est[i][1], p_est[i][2],minimum[i],label='Estimated')
+	ax.set_xlabel('Easting [m]')
+	ax.set_ylabel('Northing [m]')
+	ax.set_zlabel('Up [m]')
+	ax.set_title('Ground Truth and Estimated Trajectory')
+	ax.set_xlim(0, 200)
+	ax.set_ylim(0, 200)
+	ax.set_zlim(-2, 2)
+	ax.set_xticks([0, 50, 100, 150, 200])
+	ax.set_yticks([0, 50, 100, 150, 200])
+	ax.set_zticks([-2, -1, 0, 1, 2])
+	ax.legend(loc=(0.62,0.77))
+	ax.view_init(elev=45, azim=-50)
+	plt.show()
+	time.sleep(10)
 ################################################################################################
 # We can also plot the error for each of the 6 DOF, with estimates for our uncertainty
 # included. The error estimates are in blue, and the uncertainty bounds are red and dashed.
